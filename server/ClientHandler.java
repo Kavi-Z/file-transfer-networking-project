@@ -6,73 +6,59 @@ import java.net.Socket;
 public class ClientHandler implements Runnable {
 
     private Socket socket;
+    private String uploadDir;
 
-    public ClientHandler(Socket socket) {
+    public ClientHandler(Socket socket, String uploadDir) {
         this.socket = socket;
+        this.uploadDir = uploadDir;
     }
 
+    @Override
     public void run() {
         try {
-            DataInputStream in = new DataInputStream(socket.getInputStream());
-            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            DataInputStream dis = new DataInputStream(socket.getInputStream());
 
-            while (true) {
-                String command = in.readUTF();
+            int nameLength = dis.readInt();
 
-                if (command.equalsIgnoreCase("UPLOAD")) {
-                    String fileName = in.readUTF();
-                    long fileSize = in.readLong();
+            byte[] nameBytes = new byte[nameLength];
+            dis.readFully(nameBytes);
+            String fileName = new String(nameBytes);
 
-                    File file = new File("uploads/" + fileName);
-                    file.getParentFile().mkdirs();
+            long fileSize = dis.readLong();
 
-                    FileOutputStream fos = new FileOutputStream(file);
-                    byte[] buffer = new byte[4096];
-                    long read = 0;
+            System.out.println("Receiving file: " + fileName);
+            System.out.println("Expected size: " + fileSize + " bytes");
 
-                    while (read < fileSize) {
-                        int bytes = in.read(buffer, 0, (int)Math.min(buffer.length, fileSize - read));
-                        read += bytes;
-                        fos.write(buffer, 0, bytes);
-                    }
+            File uploads = new File(uploadDir);
+            uploads.mkdirs();
 
-                    fos.close();
-                    out.writeUTF("OK");
-                    System.out.println("File received: " + fileName);
+            FileOutputStream fos = new FileOutputStream(uploadDir + "/" + fileName);
 
-                } else if (command.equalsIgnoreCase("DOWNLOAD")) {
-                    String fileName = in.readUTF();
-                    File file = new File("uploads/" + fileName);
+            byte[] buffer = new byte[4096];
+            long totalRead = 0;
+            int bytesRead;
 
-                    if (!file.exists()) {
-                        out.writeLong(-1);
-                        out.writeUTF("ERROR: File not found");
-                        continue;
-                    }
+            while (totalRead < fileSize &&
+                  (bytesRead = dis.read(buffer, 0,
+                   (int)Math.min(buffer.length, fileSize - totalRead))) != -1) {
 
-                    out.writeLong(file.length());
-                    FileInputStream fis = new FileInputStream(file);
-                    byte[] buffer = new byte[4096];
-                    int bytes;
-                    while ((bytes = fis.read(buffer)) != -1) {
-                        out.write(buffer, 0, bytes);
-                    }
-                    fis.close();
-                    out.flush();
-                    out.writeUTF("OK");
-                    System.out.println("File sent: " + fileName);
-
-                } else {
-                    out.writeUTF("ERROR: Unknown command");
-                }
+                fos.write(buffer, 0, bytesRead);
+                totalRead += bytesRead;
             }
 
-        } catch (IOException e) {
-            System.out.println("Client disconnected.");
-        } finally {
-            try {
-                socket.close();
-            } catch (IOException e) {}
+            fos.close();
+
+            System.out.println("File saved successfully!");
+            System.out.println("Actual received: " + totalRead + " bytes");
+
+            DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+            dos.writeUTF("OK");
+            dos.flush();
+
+            socket.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }
