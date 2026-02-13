@@ -29,15 +29,26 @@ public class Client {
                 out.writeUTF("UPLOAD");
                 out.writeUTF(file.getName());
                 out.writeLong(file.length());
-
-                FileInputStream fis = new FileInputStream(file);
-                byte[] buffer = new byte[4096];
-                int bytes;
-                while ((bytes = fis.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytes);
+                
+                // Wait for server permission
+                String permission = in.readUTF();
+                if ("ALLOWED".equals(permission)) {
+                    System.out.println("Server allowed the upload. Sending file...");
+                    
+                    FileInputStream fis = new FileInputStream(file);
+                    byte[] buffer = new byte[4096];
+                    int bytes;
+                    while ((bytes = fis.read(buffer)) != -1) {
+                        out.write(buffer, 0, bytes);
+                    }
+                    fis.close();
+                    
+                    String result = in.readUTF();
+                    System.out.println("Server response: " + result);
+                } else {
+                    String result = in.readUTF();
+                    System.out.println("Upload denied: " + result);
                 }
-                fis.close();
-                System.out.println("Server: " + in.readUTF());
 
             } else if (choice == 2) {
                 System.out.print("Enter file name to download: ");
