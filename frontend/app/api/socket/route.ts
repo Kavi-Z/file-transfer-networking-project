@@ -23,7 +23,7 @@ export const POST = async (req: NextRequest) => {
         const sizeBuffer = Buffer.alloc(8);
         sizeBuffer.writeBigInt64BE(BigInt(fileBuffer.length), 0);
 
-        // Send metadata + file
+        
         client.write(header);
         client.write(nameBuffer);
         client.write(sizeBuffer);
