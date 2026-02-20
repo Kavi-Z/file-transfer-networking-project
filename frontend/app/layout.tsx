@@ -1,3 +1,4 @@
+ 
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
@@ -40,6 +41,19 @@ export default function RootLayout({
         <div className="relative" style={{ zIndex: 10 }}>
           {children}
         </div>
+ 
+import "./globals.css";
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className="bg-slate-950 text-white">
+        {children}
+ 
       </body>
     </html>
   );

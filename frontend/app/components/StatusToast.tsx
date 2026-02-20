@@ -65,7 +65,19 @@ export default function StatusToast({ toast, onClose }: StatusToastProps) {
 
   const { icon, bar } = config[toast.type];
 
+
+interface StatusToastProps {
+  toast: ToastMessage;
+  onClose: () => void;
+}
+
+
+export default function StatusToast({
+  toast,
+  onClose,
+}: StatusToastProps) {
   return (
+ 
     <div
       className={`glass-strong rounded-xl overflow-hidden transition-all duration-300 ${
         isVisible
@@ -93,6 +105,17 @@ export default function StatusToast({ toast, onClose }: StatusToastProps) {
           className={`h-full ${bar} transition-all duration-100 ease-linear opacity-50`}
           style={{ width: `${progress}%` }}
         />
+ 
+    <div className="p-4 rounded-xl bg-slate-800 text-white shadow-lg border border-white/10">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm">{toast.message}</span>
+        <button
+          onClick={onClose}
+          className="text-slate-400 hover:text-white transition"
+        >
+          ✕
+        </button>
+ 
       </div>
     </div>
   );

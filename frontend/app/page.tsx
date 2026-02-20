@@ -56,6 +56,7 @@ export default function Home() {
       setActiveTab("files");
       for (const file of filesToUpload) {
         const fileId = crypto.randomUUID();
+
         const uploadedFile: UploadedFile = {
           id: fileId,
           name: file.name,
@@ -99,7 +100,11 @@ export default function Home() {
             setTotalUploaded((prev) => prev + file.size);
             addToast("success", `${file.name} uploaded`);
           } else {
+ 
             throw new Error(data.error);
+ 
+            throw new Error();
+ 
           }
         } catch {
           setFiles((prev) =>
@@ -123,6 +128,7 @@ export default function Home() {
         );
         if (!res.ok) throw new Error("Download failed");
         const blob = await res.blob();
+ 
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -133,6 +139,54 @@ export default function Home() {
         addToast("success", `${fileName} downloaded`);
       } catch {
         addToast("error", `Failed to download ${fileName}`);
+ 
+        
+        // Check if File System Access API is supported
+        if ('showSaveFilePicker' in window) {
+          try {
+            // Let user choose where to save the file
+            const handle = await (window as any).showSaveFilePicker({
+              suggestedName: fileName,
+              types: [
+                {
+                  description: 'All Files',
+                  accept: { '*/*': ['.*'] },
+                },
+              ],
+            });
+
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+
+            setTotalDownloaded((prev) => prev + blob.size);
+            addToast("success", `"${fileName}" downloaded successfully`);
+          } catch (err: any) {
+            // User cancelled the save dialog
+            if (err.name === 'AbortError') {
+              addToast("info", "Download cancelled");
+              return;
+            }
+            throw err;
+          }
+        } else {
+          // Fallback for browsers that don't support File System Access API
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+
+          setTotalDownloaded((prev) => prev + blob.size);
+          addToast("success", `"${fileName}" downloaded successfully`);
+        }
+      } catch (error) {
+        console.error('Download error:', error);
+        addToast("error", `Failed to download "${fileName}"`);
+ 
       }
     },
     [addToast]
@@ -150,7 +204,12 @@ export default function Home() {
     (id: string) => {
       const fileRecord = files.find((f) => f.id === id);
       if (!fileRecord) return;
+ 
       addToast("info", `Retrying ${fileRecord.name}…`);
+ 
+
+      addToast("info", `Retrying upload of "${fileRecord.name}"...`);
+ 
       setFiles((prev) =>
         prev.map((f) =>
           f.id === id ? { ...f, status: "uploading", progress: 0 } : f
@@ -180,7 +239,11 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen z-10">
+ 
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+ 
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+ 
         <Header />
 
         <StatsPanel
@@ -191,6 +254,7 @@ export default function Home() {
           totalDownloaded={totalDownloaded}
         />
 
+ 
         {/* Tab Navigation */}
         <div
           className="flex items-center justify-between mb-6 animate-fade-in-up"
@@ -293,6 +357,75 @@ export default function Home() {
 
       {/* Toast Container */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+ 
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab("upload")}
+            className={`px-6 py-3 rounded-xl font-medium transition-all ${
+              activeTab === "upload"
+                ? "bg-violet-600 text-white shadow-lg shadow-violet-500/50"
+                : "glass text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            Upload
+          </button>
+
+          <button
+            onClick={() => setActiveTab("files")}
+            className={`px-6 py-3 rounded-xl font-medium transition-all ${
+              activeTab === "files"
+                ? "bg-violet-600 text-white shadow-lg shadow-violet-500/50"
+                : "glass text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            Download ({completedFiles.length})
+          </button>
+        </div>
+
+        {/* Content */}
+        {activeTab === "upload" && (
+          <FileUploadZone onUpload={handleUpload} />
+        )}
+
+        {activeTab === "files" && (
+          <div className="space-y-4">
+            {completedFiles.length === 0 ? (
+              <div className="glass rounded-2xl p-12 text-center">
+                <svg
+                  className="mx-auto h-12 w-12 text-slate-400 mb-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                  />
+                </svg>
+                <h3 className="text-lg font-medium text-slate-300 mb-2">
+                  No files uploaded yet
+                </h3>
+                <p className="text-slate-400">
+                  Upload files to see them here for download
+                </p>
+              </div>
+            ) : (
+              <FileList
+                files={completedFiles}
+                onDownload={handleDownload}
+                onDelete={handleDelete}
+                onRetry={handleRetry}
+              />
+            )}
+          </div>
+        )}
+      </div>
+ 
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+ 
         {toasts.map((toast) => (
           <div key={toast.id} className="pointer-events-auto">
             <StatusToast
