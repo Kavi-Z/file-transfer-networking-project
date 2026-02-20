@@ -1,4 +1,3 @@
-// app/page.tsx
 "use client";
 
 import { useState, useCallback } from "react";
@@ -47,6 +46,7 @@ export default function Home() {
     async (filesToUpload: File[]) => {
       for (const file of filesToUpload) {
         const fileId = crypto.randomUUID();
+
         const uploadedFile: UploadedFile = {
           id: fileId,
           name: file.name,
@@ -60,7 +60,6 @@ export default function Home() {
         setFiles((prev) => [uploadedFile, ...prev]);
 
         try {
-          // Simulate progress for better UX
           const progressInterval = setInterval(() => {
             setFiles((prev) =>
               prev.map((f) =>
@@ -94,10 +93,9 @@ export default function Home() {
             setTotalUploaded((prev) => prev + file.size);
             addToast("success", `"${file.name}" uploaded successfully`);
           } else {
-            throw new Error(data.error || "Upload failed");
+            throw new Error();
           }
-        } catch (err) {
-          console.error(err);
+        } catch {
           setFiles((prev) =>
             prev.map((f) =>
               f.id === fileId ? { ...f, status: "failed", progress: 0 } : f
@@ -121,17 +119,51 @@ export default function Home() {
         if (!res.ok) throw new Error("Download failed");
 
         const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = fileName;
-        a.click();
-        URL.revokeObjectURL(url);
+        
+        // Check if File System Access API is supported
+        if ('showSaveFilePicker' in window) {
+          try {
+            // Let user choose where to save the file
+            const handle = await (window as any).showSaveFilePicker({
+              suggestedName: fileName,
+              types: [
+                {
+                  description: 'All Files',
+                  accept: { '*/*': ['.*'] },
+                },
+              ],
+            });
 
-        setTotalDownloaded((prev) => prev + blob.size);
-        addToast("success", `"${fileName}" downloaded successfully`);
-      } catch (err) {
-        console.error(err);
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+
+            setTotalDownloaded((prev) => prev + blob.size);
+            addToast("success", `"${fileName}" downloaded successfully`);
+          } catch (err: any) {
+            // User cancelled the save dialog
+            if (err.name === 'AbortError') {
+              addToast("info", "Download cancelled");
+              return;
+            }
+            throw err;
+          }
+        } else {
+          // Fallback for browsers that don't support File System Access API
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+
+          setTotalDownloaded((prev) => prev + blob.size);
+          addToast("success", `"${fileName}" downloaded successfully`);
+        }
+      } catch (error) {
+        console.error('Download error:', error);
         addToast("error", `Failed to download "${fileName}"`);
       }
     },
@@ -147,10 +179,12 @@ export default function Home() {
   );
 
   const handleRetry = useCallback(
-    async (id: string) => {
+    (id: string) => {
       const fileRecord = files.find((f) => f.id === id);
       if (!fileRecord) return;
+
       addToast("info", `Retrying upload of "${fileRecord.name}"...`);
+
       setFiles((prev) =>
         prev.map((f) =>
           f.id === id ? { ...f, status: "uploading", progress: 0 } : f
@@ -165,13 +199,6 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen z-10">
-      {/* Background decorative elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-violet-600/20 rounded-full blur-[100px]" />
-        <div className="absolute top-1/2 -left-40 w-96 h-96 bg-cyan-600/15 rounded-full blur-[120px]" />
-        <div className="absolute -bottom-40 right-1/3 w-72 h-72 bg-fuchsia-600/15 rounded-full blur-[100px]" />
-      </div>
-
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Header />
 
@@ -182,62 +209,72 @@ export default function Home() {
           totalDownloaded={totalDownloaded}
         />
 
-        {/* Tab Navigation */}
-        <div className="flex gap-2 mb-6 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6">
           <button
             onClick={() => setActiveTab("upload")}
-            className={`px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
+            className={`px-6 py-3 rounded-xl font-medium transition-all ${
               activeTab === "upload"
-                ? "bg-violet-600 text-white shadow-lg shadow-violet-600/30"
-                : "glass text-slate-400 hover:text-white hover:bg-white/10"
+                ? "bg-violet-600 text-white shadow-lg shadow-violet-500/50"
+                : "glass text-slate-400 hover:text-slate-200"
             }`}
           >
-            <span className="flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              Upload
-            </span>
+            Upload
           </button>
+
           <button
             onClick={() => setActiveTab("files")}
-            className={`px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
+            className={`px-6 py-3 rounded-xl font-medium transition-all ${
               activeTab === "files"
-                ? "bg-violet-600 text-white shadow-lg shadow-violet-600/30"
-                : "glass text-slate-400 hover:text-white hover:bg-white/10"
+                ? "bg-violet-600 text-white shadow-lg shadow-violet-500/50"
+                : "glass text-slate-400 hover:text-slate-200"
             }`}
           >
-            <span className="flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
-              Files
-              {completedFiles.length > 0 && (
-                <span className="bg-violet-500/30 text-violet-200 text-xs px-2 py-0.5 rounded-full">
-                  {completedFiles.length}
-                </span>
-              )}
-            </span>
+            Download ({completedFiles.length})
           </button>
         </div>
 
         {/* Content */}
-        <div className="animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
-          {activeTab === "upload" && (
-            <FileUploadZone onUpload={handleUpload} />
-          )}
-          {activeTab === "files" && (
-            <FileList
-              files={files}
-              onDownload={handleDownload}
-              onDelete={handleDelete}
-              onRetry={handleRetry}
-            />
-          )}
-        </div>
-      </div>
+        {activeTab === "upload" && (
+          <FileUploadZone onUpload={handleUpload} />
+        )}
 
-      {/* Toast Container */}
+        {activeTab === "files" && (
+          <div className="space-y-4">
+            {completedFiles.length === 0 ? (
+              <div className="glass rounded-2xl p-12 text-center">
+                <svg
+                  className="mx-auto h-12 w-12 text-slate-400 mb-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                  />
+                </svg>
+                <h3 className="text-lg font-medium text-slate-300 mb-2">
+                  No files uploaded yet
+                </h3>
+                <p className="text-slate-400">
+                  Upload files to see them here for download
+                </p>
+              </div>
+            ) : (
+              <FileList
+                files={completedFiles}
+                onDownload={handleDownload}
+                onDelete={handleDelete}
+                onRetry={handleRetry}
+              />
+            )}
+          </div>
+        )}
+      </div>
+ 
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
         {toasts.map((toast) => (
           <StatusToast

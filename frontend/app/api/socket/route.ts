@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import net from "net";
 
-const SERVER_IP = "172.17.168.90";
+const SERVER_IP = "192.168.137.24";
 const SERVER_PORT = 6600;
 
 export const POST = async (req: NextRequest) => {

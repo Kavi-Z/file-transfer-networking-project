@@ -1,22 +1,26 @@
-// app/components/ProgressBar.tsx
 "use client";
 
-interface ProgressBarProps {
-  progress: number;
+import { ToastMessage } from "../page";
+
+interface StatusToastProps {
+  toast: ToastMessage;
+  onClose: () => void;
 }
 
-export default function ProgressBar({ progress }: ProgressBarProps) {
-  const clampedProgress = Math.min(100, Math.max(0, progress));
-
+export default function StatusToast({
+  toast,
+  onClose,
+}: StatusToastProps) {
   return (
-    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-      <div
-        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all duration-300 relative"
-        style={{ width: `${clampedProgress}%` }}
-      >
-        {clampedProgress < 100 && (
-          <div className="absolute inset-0 animate-shimmer" />
-        )}
+    <div className="p-4 rounded-xl bg-slate-800 text-white shadow-lg border border-white/10">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm">{toast.message}</span>
+        <button
+          onClick={onClose}
+          className="text-slate-400 hover:text-white transition"
+        >
+          ✕
+        </button>
       </div>
     </div>
   );
