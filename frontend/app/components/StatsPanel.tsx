@@ -1,9 +1,9 @@
-// app/components/StatsPanel.tsx
 "use client";
 
 interface StatsPanelProps {
   totalFiles: number;
   activeUploads: number;
+  failedUploads: number;
   totalUploaded: number;
   totalDownloaded: number;
 }
@@ -11,7 +11,7 @@ interface StatsPanelProps {
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
@@ -19,78 +19,153 @@ function formatBytes(bytes: number): string {
 export default function StatsPanel({
   totalFiles,
   activeUploads,
+  failedUploads,
   totalUploaded,
   totalDownloaded,
 }: StatsPanelProps) {
   const stats = [
     {
-      label: "Files Transferred",
+      label: "Completed",
       value: totalFiles.toString(),
       icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
         </svg>
       ),
-      color: "from-violet-500 to-purple-600",
-      shadowColor: "shadow-violet-600/20",
+      color: "text-emerald-400",
+      bg: "bg-emerald-500/10",
+      border: "border-emerald-500/20",
     },
     {
-      label: "Active Uploads",
+      label: "Uploading",
       value: activeUploads.toString(),
       icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+          />
         </svg>
       ),
-      color: "from-cyan-500 to-blue-600",
-      shadowColor: "shadow-cyan-600/20",
+      color: "text-blue-400",
+      bg: "bg-blue-500/10",
+      border: "border-blue-500/20",
     },
     {
-      label: "Total Uploaded",
+      label: "Uploaded",
       value: formatBytes(totalUploaded),
       icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M5 10l7-7m0 0l7 7m-7-7v18"
+          />
         </svg>
       ),
-      color: "from-emerald-500 to-teal-600",
-      shadowColor: "shadow-emerald-600/20",
+      color: "text-violet-400",
+      bg: "bg-violet-500/10",
+      border: "border-violet-500/20",
     },
     {
-      label: "Total Downloaded",
+      label: "Downloaded",
       value: formatBytes(totalDownloaded),
       icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M19 14l-7 7m0 0l-7-7m7 7V3"
+          />
         </svg>
       ),
-      color: "from-orange-500 to-red-600",
-      shadowColor: "shadow-orange-600/20",
+      color: "text-amber-400",
+      bg: "bg-amber-500/10",
+      border: "border-amber-500/20",
     },
   ];
 
+  // Hide failed stat if zero
+  if (failedUploads > 0) {
+    stats.splice(2, 0, {
+      label: "Failed",
+      value: failedUploads.toString(),
+      icon: (
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      ),
+      color: "text-rose-400",
+      bg: "bg-rose-500/10",
+      border: "border-rose-500/20",
+    });
+  }
+
   return (
     <div
-      className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 animate-fade-in-up"
+      className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 animate-fade-in-up"
       style={{ animationDelay: "0.1s" }}
     >
-      {stats.map((stat, index) => (
+      {stats.slice(0, 4).map((stat, idx) => (
         <div
           key={stat.label}
-          className={`glass rounded-2xl p-5 hover:bg-white/10 transition-all duration-300 group cursor-default ${stat.shadowColor} hover:shadow-lg`}
-          style={{ animationDelay: `${index * 0.05}s` }}
+          className={`glass-card rounded-2xl p-4 hover-lift cursor-default group border ${stat.border} transition-all duration-300`}
+          style={{ animationDelay: `${idx * 0.05}s` }}
         >
-          <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-3">
             <div
-              className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}
+              className={`w-9 h-9 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center transition-transform duration-300 group-hover:scale-110`}
             >
               {stat.icon}
             </div>
+            <div className="min-w-0">
+              <p className="text-lg font-bold text-white tabular-nums leading-tight">
+                {stat.value}
+              </p>
+              <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">
+                {stat.label}
+              </p>
+            </div>
           </div>
-          <p className="text-2xl font-bold text-white mb-1">{stat.value}</p>
-          <p className="text-xs text-slate-400 uppercase tracking-wider">
-            {stat.label}
-          </p>
         </div>
       ))}
     </div>
