@@ -16,8 +16,7 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "ShareVault — Instant Secure File Transfer",
-  description:
-    "Blazing-fast, peer-to-peer file sharing powered by socket technology",
+  description: "Blazing-fast file sharing powered by socket technology",
 };
 
 export default function RootLayout({
@@ -27,11 +26,20 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body
         className={`${inter.variable} ${jetbrains.variable} antialiased noise-overlay`}
+        style={{ fontFamily: "var(--font-geist-sans), system-ui, sans-serif" }}
       >
-        {/* Mesh gradient background */}
-        <div className="mesh-bg" />
-        <div className="grid-pattern fixed inset-0 z-0 pointer-events-none" />
-        {children}
+        {/* Background layers */}
+        <div className="mesh-bg" aria-hidden="true" />
+        <div
+          className="grid-pattern fixed inset-0 pointer-events-none"
+          style={{ zIndex: 0 }}
+          aria-hidden="true"
+        />
+
+        {/* Content above backgrounds */}
+        <div className="relative" style={{ zIndex: 10 }}>
+          {children}
+        </div>
       </body>
     </html>
   );
