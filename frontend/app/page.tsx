@@ -1,7 +1,6 @@
-// app/page.tsx
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Header from "./components/Header";
 import FileUploadZone from "./components/FileUploadZone";
 import FileList from "./components/FileList";
@@ -24,20 +23,29 @@ export interface ToastMessage {
   message: string;
 }
 
+export type ViewMode = "grid" | "list";
+export type FileFilter = "all" | "images" | "documents" | "media" | "archives";
+
 export default function Home() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [activeTab, setActiveTab] = useState<"upload" | "files">("upload");
   const [totalUploaded, setTotalUploaded] = useState(0);
   const [totalDownloaded, setTotalDownloaded] = useState(0);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [fileFilter, setFileFilter] = useState<FileFilter>("all");
 
-  const addToast = useCallback((type: ToastMessage["type"], message: string) => {
-    const id = crypto.randomUUID();
-    setToasts((prev) => [...prev, { id, type, message }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
-  }, []);
+  const addToast = useCallback(
+    (type: ToastMessage["type"], message: string) => {
+      const id = crypto.randomUUID();
+      setToasts((prev) => [...prev, { id, type, message }]);
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 4000);
+    },
+    []
+  );
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -45,6 +53,7 @@ export default function Home() {
 
   const handleUpload = useCallback(
     async (filesToUpload: File[]) => {
+      setActiveTab("files");
       for (const file of filesToUpload) {
         const fileId = crypto.randomUUID();
         const uploadedFile: UploadedFile = {
@@ -60,12 +69,11 @@ export default function Home() {
         setFiles((prev) => [uploadedFile, ...prev]);
 
         try {
-          // Simulate progress for better UX
           const progressInterval = setInterval(() => {
             setFiles((prev) =>
               prev.map((f) =>
                 f.id === fileId && f.progress < 90
-                  ? { ...f, progress: f.progress + Math.random() * 15 }
+                  ? { ...f, progress: f.progress + Math.random() * 12 }
                   : f
               )
             );
@@ -73,14 +81,11 @@ export default function Home() {
 
           const res = await fetch("/api/upload", {
             method: "POST",
-            headers: {
-              "x-filename": encodeURIComponent(file.name),
-            },
+            headers: { "x-filename": encodeURIComponent(file.name) },
             body: file,
           });
 
           clearInterval(progressInterval);
-
           const data = await res.json();
 
           if (data.success) {
@@ -92,18 +97,17 @@ export default function Home() {
               )
             );
             setTotalUploaded((prev) => prev + file.size);
-            addToast("success", `"${file.name}" uploaded successfully`);
+            addToast("success", `${file.name} uploaded`);
           } else {
-            throw new Error(data.error || "Upload failed");
+            throw new Error(data.error);
           }
-        } catch (err) {
-          console.error(err);
+        } catch {
           setFiles((prev) =>
             prev.map((f) =>
               f.id === fileId ? { ...f, status: "failed", progress: 0 } : f
             )
           );
-          addToast("error", `Failed to upload "${file.name}"`);
+          addToast("error", `Failed to upload ${file.name}`);
         }
       }
     },
@@ -112,14 +116,12 @@ export default function Home() {
 
   const handleDownload = useCallback(
     async (fileName: string) => {
-      addToast("info", `Downloading "${fileName}"...`);
+      addToast("info", `Downloading ${fileName}…`);
       try {
         const res = await fetch(
           `/api/download?filename=${encodeURIComponent(fileName)}`
         );
-
         if (!res.ok) throw new Error("Download failed");
-
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -127,12 +129,10 @@ export default function Home() {
         a.download = fileName;
         a.click();
         URL.revokeObjectURL(url);
-
         setTotalDownloaded((prev) => prev + blob.size);
-        addToast("success", `"${fileName}" downloaded successfully`);
-      } catch (err) {
-        console.error(err);
-        addToast("error", `Failed to download "${fileName}"`);
+        addToast("success", `${fileName} downloaded`);
+      } catch {
+        addToast("error", `Failed to download ${fileName}`);
       }
     },
     [addToast]
@@ -141,16 +141,16 @@ export default function Home() {
   const handleDelete = useCallback(
     (id: string) => {
       setFiles((prev) => prev.filter((f) => f.id !== id));
-      addToast("info", "File removed from list");
+      addToast("info", "File removed");
     },
     [addToast]
   );
 
   const handleRetry = useCallback(
-    async (id: string) => {
+    (id: string) => {
       const fileRecord = files.find((f) => f.id === id);
       if (!fileRecord) return;
-      addToast("info", `Retrying upload of "${fileRecord.name}"...`);
+      addToast("info", `Retrying ${fileRecord.name}…`);
       setFiles((prev) =>
         prev.map((f) =>
           f.id === id ? { ...f, status: "uploading", progress: 0 } : f
@@ -160,69 +160,117 @@ export default function Home() {
     [files, addToast]
   );
 
-  const completedFiles = files.filter((f) => f.status === "completed");
-  const uploadingFiles = files.filter((f) => f.status === "uploading");
+  const handleClearAll = useCallback(() => {
+    setFiles([]);
+    addToast("info", "All files cleared");
+  }, [addToast]);
+
+  const completedFiles = useMemo(
+    () => files.filter((f) => f.status === "completed"),
+    [files]
+  );
+  const uploadingFiles = useMemo(
+    () => files.filter((f) => f.status === "uploading"),
+    [files]
+  );
+  const failedFiles = useMemo(
+    () => files.filter((f) => f.status === "failed"),
+    [files]
+  );
 
   return (
     <div className="relative min-h-screen z-10">
-      {/* Background decorative elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-violet-600/20 rounded-full blur-[100px]" />
-        <div className="absolute top-1/2 -left-40 w-96 h-96 bg-cyan-600/15 rounded-full blur-[120px]" />
-        <div className="absolute -bottom-40 right-1/3 w-72 h-72 bg-fuchsia-600/15 rounded-full blur-[100px]" />
-      </div>
-
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <Header />
 
         <StatsPanel
           totalFiles={completedFiles.length}
           activeUploads={uploadingFiles.length}
+          failedUploads={failedFiles.length}
           totalUploaded={totalUploaded}
           totalDownloaded={totalDownloaded}
         />
 
         {/* Tab Navigation */}
-        <div className="flex gap-2 mb-6 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
-          <button
-            onClick={() => setActiveTab("upload")}
-            className={`px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
-              activeTab === "upload"
-                ? "bg-violet-600 text-white shadow-lg shadow-violet-600/30"
-                : "glass text-slate-400 hover:text-white hover:bg-white/10"
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              Upload
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab("files")}
-            className={`px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
-              activeTab === "files"
-                ? "bg-violet-600 text-white shadow-lg shadow-violet-600/30"
-                : "glass text-slate-400 hover:text-white hover:bg-white/10"
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
-              Files
-              {completedFiles.length > 0 && (
-                <span className="bg-violet-500/30 text-violet-200 text-xs px-2 py-0.5 rounded-full">
-                  {completedFiles.length}
-                </span>
-              )}
-            </span>
-          </button>
+        <div
+          className="flex items-center justify-between mb-6 animate-fade-in-up"
+          style={{ animationDelay: "0.2s" }}
+        >
+          <div className="flex gap-1 p-1 glass rounded-2xl">
+            <button
+              onClick={() => setActiveTab("upload")}
+              className={`relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 focus-ring ${
+                activeTab === "upload"
+                  ? "bg-gradient-to-r from-blue-600/90 to-violet-600/90 text-white shadow-lg shadow-blue-500/20"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 16V4m0 0L8 8m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                  />
+                </svg>
+                Upload
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab("files")}
+              className={`relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 focus-ring ${
+                activeTab === "files"
+                  ? "bg-gradient-to-r from-blue-600/90 to-violet-600/90 text-white shadow-lg shadow-blue-500/20"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-5l-2-2H5a2 2 0 00-2 2z"
+                  />
+                </svg>
+                Files
+                {files.length > 0 && (
+                  <span className="ml-1 bg-white/15 text-xs px-2 py-0.5 rounded-full tabular-nums">
+                    {files.length}
+                  </span>
+                )}
+              </span>
+            </button>
+          </div>
+
+          {activeTab === "files" && files.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleClearAll}
+                className="px-3 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all focus-ring"
+              >
+                Clear All
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Content */}
-        <div className="animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+        <div
+          className="animate-fade-in-up"
+          style={{ animationDelay: "0.3s" }}
+        >
           {activeTab === "upload" && (
             <FileUploadZone onUpload={handleUpload} />
           )}
@@ -232,19 +280,26 @@ export default function Home() {
               onDownload={handleDownload}
               onDelete={handleDelete}
               onRetry={handleRetry}
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              fileFilter={fileFilter}
+              setFileFilter={setFileFilter}
             />
           )}
         </div>
       </div>
 
       {/* Toast Container */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
         {toasts.map((toast) => (
-          <StatusToast
-            key={toast.id}
-            toast={toast}
-            onClose={() => removeToast(toast.id)}
-          />
+          <div key={toast.id} className="pointer-events-auto">
+            <StatusToast
+              toast={toast}
+              onClose={() => removeToast(toast.id)}
+            />
+          </div>
         ))}
       </div>
     </div>

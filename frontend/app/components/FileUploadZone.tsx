@@ -1,4 +1,3 @@
-// app/components/FileUploadZone.tsx
 "use client";
 
 import { useState, useRef, useCallback } from "react";
@@ -11,17 +10,20 @@ export default function FileUploadZone({ onUpload }: FileUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dragCounter = useRef(0);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCounter.current++;
     setIsDragging(true);
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
+    dragCounter.current--;
+    if (dragCounter.current === 0) setIsDragging(false);
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -32,19 +34,17 @@ export default function FileUploadZone({ onUpload }: FileUploadZoneProps) {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCounter.current = 0;
     setIsDragging(false);
-
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    if (droppedFiles.length > 0) {
-      setSelectedFiles((prev) => [...prev, ...droppedFiles]);
-    }
+    const dropped = Array.from(e.dataTransfer.files);
+    if (dropped.length) setSelectedFiles((prev) => [...prev, ...dropped]);
   }, []);
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files) {
-        const newFiles = Array.from(e.target.files);
-        setSelectedFiles((prev) => [...prev, ...newFiles]);
+        setSelectedFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
+        e.target.value = "";
       }
     },
     []
@@ -54,11 +54,14 @@ export default function FileUploadZone({ onUpload }: FileUploadZoneProps) {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
+  const clearAll = useCallback(() => {
+    setSelectedFiles([]);
+  }, []);
+
   const handleUploadAll = useCallback(() => {
-    if (selectedFiles.length === 0) return;
+    if (!selectedFiles.length) return;
     onUpload(selectedFiles);
     setSelectedFiles([]);
-    if (inputRef.current) inputRef.current.value = "";
   }, [selectedFiles, onUpload]);
 
   const formatSize = (bytes: number) => {
@@ -67,162 +70,205 @@ export default function FileUploadZone({ onUpload }: FileUploadZoneProps) {
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
-  const getFileIcon = (type: string) => {
-    if (type.startsWith("image/"))
-      return (
-        <svg className="w-5 h-5 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      );
-    if (type.startsWith("video/"))
-      return (
-        <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-        </svg>
-      );
-    if (type === "application/pdf")
-      return (
-        <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-        </svg>
-      );
-    return (
-      <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    );
-  };
+  const totalSize = selectedFiles.reduce((s, f) => s + f.size, 0);
 
   return (
-    <div className="space-y-6">
-      {/* Drop Zone */}
+    <div className="space-y-5">
+      {/* Drop zone */}
       <div
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`relative rounded-3xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-500 group ${
+        className={`relative rounded-2xl transition-all duration-500 cursor-pointer group overflow-hidden ${
           isDragging
-            ? "border-violet-400 bg-violet-600/10 drop-zone-active"
-            : "border-white/10 hover:border-violet-500/50 hover:bg-white/5"
+            ? "border-2 border-blue-400/60 bg-blue-500/[0.06]"
+            : "border-2 border-dashed border-white/[0.08] hover:border-white/[0.15] bg-white/[0.01] hover:bg-white/[0.02]"
         }`}
       >
+        {/* Animated border gradient when dragging */}
+        {isDragging && (
+          <div className="absolute inset-0 rounded-2xl">
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/10 via-violet-500/10 to-rose-500/10 animate-gradient-flow" />
+          </div>
+        )}
+
+        <div className="relative px-8 py-16 sm:py-20 text-center">
+          {/* Icon */}
+          <div className="mb-5 flex justify-center">
+            <div
+              className={`relative transition-all duration-500 ${
+                isDragging ? "scale-110" : "group-hover:scale-105"
+              }`}
+            >
+              <div
+                className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-500 ${
+                  isDragging
+                    ? "bg-blue-500/20 shadow-xl shadow-blue-500/10"
+                    : "bg-white/[0.04] group-hover:bg-white/[0.06]"
+                }`}
+              >
+                <svg
+                  className={`w-7 h-7 transition-colors duration-300 ${
+                    isDragging ? "text-blue-400" : "text-slate-500 group-hover:text-slate-300"
+                  }`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 16V4m0 0L8 8m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                  />
+                </svg>
+              </div>
+
+              {/* Pulse ring when dragging */}
+              {isDragging && (
+                <div className="absolute inset-0 rounded-2xl border-2 border-blue-400/40 animate-ping" />
+              )}
+            </div>
+          </div>
+
+          <h3 className="text-lg font-semibold text-white mb-1.5">
+            {isDragging ? "Release to add files" : "Drop files here"}
+          </h3>
+          <p className="text-sm text-slate-500 mb-5">
+            or{" "}
+            <span className="text-blue-400 hover:text-blue-300 font-medium">
+              browse from device
+            </span>
+          </p>
+
+          <div className="flex items-center justify-center gap-4 text-xs text-slate-600">
+            <span>All types</span>
+            <span className="w-1 h-1 rounded-full bg-slate-700" />
+            <span>Up to 500 MB</span>
+            <span className="w-1 h-1 rounded-full bg-slate-700" />
+            <span>Multiple files</span>
+          </div>
+        </div>
+
         <input
           ref={inputRef}
           type="file"
           multiple
           onChange={handleFileChange}
           className="hidden"
+          onClick={(e) => e.stopPropagation()}
         />
-
-        {/* Upload Icon */}
-        <div className={`mx-auto mb-6 transition-transform duration-500 ${isDragging ? "scale-110" : "group-hover:scale-105"}`}>
-          <div className="relative inline-block">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-600/20 to-cyan-600/20 flex items-center justify-center mx-auto">
-              <svg
-                className={`w-10 h-10 transition-all duration-500 ${
-                  isDragging ? "text-violet-300 -translate-y-2" : "text-violet-400 group-hover:-translate-y-1"
-                }`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
-            </div>
-            {isDragging && (
-              <div className="absolute inset-0 rounded-3xl bg-violet-400/20 animate-ping" />
-            )}
-          </div>
-        </div>
-
-        <h3 className="text-xl font-semibold text-white mb-2">
-          {isDragging ? "Drop files here" : "Drag & drop files here"}
-        </h3>
-        <p className="text-slate-400 mb-4">
-          or{" "}
-          <span className="text-violet-400 underline underline-offset-2">
-            browse from your computer
-          </span>
-        </p>
-        <p className="text-xs text-slate-500">
-          Supports all file types • Max file size: 500MB
-        </p>
       </div>
 
-      {/* Selected Files Preview */}
+      {/* Selected files */}
       {selectedFiles.length > 0 && (
-        <div className="glass rounded-2xl p-6 animate-fade-in">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">
-              Ready to Upload ({selectedFiles.length}{" "}
-              {selectedFiles.length === 1 ? "file" : "files"})
-            </h3>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setSelectedFiles([])}
-                className="px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-              >
-                Clear All
-              </button>
-              <button
-                onClick={handleUploadAll}
-                className="px-6 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 text-white font-medium text-sm hover:shadow-lg hover:shadow-violet-600/25 transition-all duration-300 hover:scale-105 active:scale-95"
-              >
-                <span className="flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                  </svg>
-                  Upload All
-                </span>
-              </button>
+        <div className="glass-card rounded-2xl overflow-hidden animate-scale-in">
+          {/* Header */}
+          <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-white">
+                {selectedFiles.length} file{selectedFiles.length !== 1 && "s"}{" "}
+                selected
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {formatSize(totalSize)} total
+              </p>
             </div>
+            <button
+              onClick={clearAll}
+              className="text-xs text-slate-500 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10"
+            >
+              Remove all
+            </button>
           </div>
 
-          <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-            {selectedFiles.map((file, index) => (
+          {/* File list */}
+          <div className="max-h-60 overflow-y-auto divide-y divide-white/[0.04]">
+            {selectedFiles.map((file, idx) => (
               <div
-                key={`${file.name}-${index}`}
-                className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all group"
-                style={{ animationDelay: `${index * 0.05}s` }}
+                key={`${file.name}-${idx}`}
+                className="flex items-center gap-3 px-5 py-3 hover:bg-white/[0.02] transition-colors group"
               >
-                <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
-                  {getFileIcon(file.type)}
+                <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center flex-shrink-0">
+                  <FileTypeIcon type={file.type} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white truncate">{file.name}</p>
-                  <p className="text-xs text-slate-500">{formatSize(file.size)}</p>
+                  <p className="text-sm text-slate-300 truncate font-medium">
+                    {file.name}
+                  </p>
+                  <p className="text-[11px] text-slate-600">
+                    {formatSize(file.size)}
+                  </p>
                 </div>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFile(index);
-                  }}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover:opacity-100"
+                  onClick={() => removeFile(idx)}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 text-slate-600 hover:text-red-400 transition-all"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
             ))}
           </div>
 
-          {/* Total size */}
-          <div className="mt-4 pt-4 border-t border-white/5 flex justify-between text-sm">
-            <span className="text-slate-400">Total size</span>
-            <span className="text-white font-medium">
-              {formatSize(selectedFiles.reduce((acc, f) => acc + f.size, 0))}
-            </span>
+          {/* Upload button */}
+          <div className="px-5 py-4 border-t border-white/[0.06]">
+            <button
+              onClick={handleUploadAll}
+              className="w-full py-3 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white text-sm font-semibold rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 active:scale-[0.98] focus-ring"
+            >
+              Upload {selectedFiles.length} file
+              {selectedFiles.length !== 1 && "s"}
+            </button>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function FileTypeIcon({ type }: { type: string }) {
+  const cls = "w-4 h-4";
+  if (type.startsWith("image/"))
+    return (
+      <svg className={`${cls} text-pink-400`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+      </svg>
+    );
+  if (type.startsWith("video/"))
+    return (
+      <svg className={`${cls} text-red-400`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+      </svg>
+    );
+  if (type.startsWith("audio/"))
+    return (
+      <svg className={`${cls} text-green-400`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V4.846a2.25 2.25 0 00-1.632-2.163l-5.25-1.5A2.25 2.25 0 004.5 3.346v14.808" />
+      </svg>
+    );
+  if (type === "application/pdf")
+    return (
+      <svg className={`${cls} text-orange-400`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+      </svg>
+    );
+  return (
+    <svg className={`${cls} text-slate-400`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    </svg>
   );
 }
