@@ -37,11 +37,13 @@ public class Client {
                     out.write(buffer, 0, bytes);
                 }
                 fis.close();
+
                 System.out.println("Server: " + in.readUTF());
 
             } else if (choice == 2) {
                 System.out.print("Enter file name to download: ");
                 String fileName = scanner.nextLine();
+
                 out.writeUTF("DOWNLOAD");
                 out.writeUTF(fileName);
 
@@ -63,6 +65,7 @@ public class Client {
                     fos.write(buffer, 0, bytesRead);
                 }
                 fos.close();
+
                 System.out.println("File downloaded to downloads/" + fileName);
                 System.out.println("Server: " + in.readUTF());
 
@@ -75,4 +78,3 @@ public class Client {
         }
     }
 }
-
