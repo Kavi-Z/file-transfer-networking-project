@@ -21,38 +21,24 @@ public class ClientHandler implements Runnable {
 
             String command = dis.readUTF();
 
-            if ("UPLOAD".equals(command)) {
+            if ("LIST".equals(command)) {
+                File folder = new File(uploadDir);
+                File[] files = folder.listFiles();
 
-                String fileName = dis.readUTF();
-                long fileSize = dis.readLong();
-
-                System.out.println("Receiving: " + fileName);
-
-                File dir = new File(uploadDir);
-                dir.mkdirs();
-
-                FileOutputStream fos = new FileOutputStream(uploadDir + "/" + fileName);
-
-                byte[] buffer = new byte[4096];
-                long totalRead = 0;
-                int bytesRead;
-
-                while (totalRead < fileSize &&
-                        (bytesRead = dis.read(buffer, 0,
-                                (int)Math.min(buffer.length, fileSize - totalRead))) != -1) {
-
-                    fos.write(buffer, 0, bytesRead);
-                    totalRead += bytesRead;
+                if (files == null || files.length == 0) {
+                    dos.writeInt(0);
+                } else {
+                    dos.writeInt(files.length);
+                    for (File file : files) {
+                        dos.writeUTF(file.getName());
+                    }
                 }
 
-                fos.close();
-                System.out.println("Upload complete!");
-
-                dos.writeUTF("Upload successful!");
                 dos.flush();
+                command = dis.readUTF();
+            }
 
-            } else if ("DOWNLOAD".equals(command)) {
-
+            if ("DOWNLOAD".equals(command)) {
                 String fileName = dis.readUTF();
                 File file = new File(uploadDir + "/" + fileName);
 
@@ -77,7 +63,34 @@ public class ClientHandler implements Runnable {
                 dos.flush();
             }
 
-            socket.close(); // important: close after each request
+            else if ("UPLOAD".equals(command)) {
+                String fileName = dis.readUTF();
+                long fileSize = dis.readLong();
+
+                File dir = new File(uploadDir);
+                dir.mkdirs();
+
+                FileOutputStream fos = new FileOutputStream(uploadDir + "/" + fileName);
+
+                byte[] buffer = new byte[4096];
+                long totalRead = 0;
+                int bytesRead;
+
+                while (totalRead < fileSize &&
+                        (bytesRead = dis.read(buffer, 0,
+                                (int)Math.min(buffer.length, fileSize - totalRead))) != -1) {
+
+                    fos.write(buffer, 0, bytesRead);
+                    totalRead += bytesRead;
+                }
+
+                fos.close();
+
+                dos.writeUTF("Upload successful!");
+                dos.flush();
+            }
+
+            socket.close();
 
         } catch (Exception e) {
             e.printStackTrace();

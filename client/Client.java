@@ -19,8 +19,7 @@ public class Client {
                 System.exit(0);
             }
 
-            // 🔥 Create new connection for each request
-            Socket socket = new Socket("10.228.94.14", 6600);
+            Socket socket = new Socket("192.168.1.4", 6600);
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
             DataInputStream in = new DataInputStream(socket.getInputStream());
 
@@ -48,9 +47,26 @@ public class Client {
                 }
 
                 fis.close();
-                System.out.println("Server: " + in.readUTF());
 
-            } else if (choice == 2) {
+                System.out.println("Server: " + in.readUTF());
+            }
+
+            else if (choice == 2) {
+                out.writeUTF("LIST");
+
+                int fileCount = in.readInt();
+
+                if (fileCount == 0) {
+                    System.out.println("No files available on server!");
+                    socket.close();
+                    continue;
+                }
+
+                System.out.println("\nAvailable files:");
+                for (int i = 0; i < fileCount; i++) {
+                    System.out.println((i + 1) + ". " + in.readUTF());
+                }
+
                 System.out.print("Enter file name to download: ");
                 String fileName = scanner.nextLine();
 
@@ -86,7 +102,7 @@ public class Client {
                 System.out.println("Server: " + in.readUTF());
             }
 
-            socket.close(); // 🔥 close after each request
+            socket.close();
         }
     }
 }

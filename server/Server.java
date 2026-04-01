@@ -15,6 +15,7 @@ public class Server {
 
             while (true) {
                 Socket clientSocket = serverSocket.accept();
+                System.out.println("Client connected: " + clientSocket.getInetAddress());
                 new Thread(new ClientHandler(clientSocket, UPLOAD_DIR)).start();
             }
 
