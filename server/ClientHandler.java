@@ -19,18 +19,17 @@ public class ClientHandler implements Runnable {
             DataInputStream dis = new DataInputStream(socket.getInputStream());
             DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
 
-            // Read command from client
             String command = dis.readUTF();
 
             if ("UPLOAD".equals(command)) {
-                String fileName = dis.readUTF();   // Read file name
-                long fileSize = dis.readLong();    // Read file size
 
-                System.out.println("Receiving file: " + fileName);
-                System.out.println("Expected size: " + fileSize + " bytes");
+                String fileName = dis.readUTF();
+                long fileSize = dis.readLong();
 
-                File uploads = new File(uploadDir);
-                uploads.mkdirs();
+                System.out.println("Receiving: " + fileName);
+
+                File dir = new File(uploadDir);
+                dir.mkdirs();
 
                 FileOutputStream fos = new FileOutputStream(uploadDir + "/" + fileName);
 
@@ -39,45 +38,46 @@ public class ClientHandler implements Runnable {
                 int bytesRead;
 
                 while (totalRead < fileSize &&
-                       (bytesRead = dis.read(buffer, 0,
-                               (int)Math.min(buffer.length, fileSize - totalRead))) != -1) {
+                        (bytesRead = dis.read(buffer, 0,
+                                (int)Math.min(buffer.length, fileSize - totalRead))) != -1) {
+
                     fos.write(buffer, 0, bytesRead);
                     totalRead += bytesRead;
                 }
 
                 fos.close();
-                System.out.println("File saved successfully!");
-                System.out.println("Actual received: " + totalRead + " bytes");
+                System.out.println("Upload complete!");
 
                 dos.writeUTF("Upload successful!");
                 dos.flush();
 
             } else if ("DOWNLOAD".equals(command)) {
+
                 String fileName = dis.readUTF();
                 File file = new File(uploadDir + "/" + fileName);
 
                 if (!file.exists()) {
                     dos.writeLong(-1);
-                    dos.writeUTF("File not found on server!");
-                    dos.flush();
+                    dos.writeUTF("File not found!");
                 } else {
                     dos.writeLong(file.length());
 
                     FileInputStream fis = new FileInputStream(file);
                     byte[] buffer = new byte[4096];
                     int bytesRead;
+
                     while ((bytesRead = fis.read(buffer)) != -1) {
                         dos.write(buffer, 0, bytesRead);
                     }
-                    fis.close();
-                    dos.flush();
 
+                    fis.close();
                     dos.writeUTF("Download complete!");
-                    dos.flush();
                 }
+
+                dos.flush();
             }
 
-            socket.close();
+            socket.close(); // important: close after each request
 
         } catch (Exception e) {
             e.printStackTrace();
